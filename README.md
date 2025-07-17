@@ -105,7 +105,7 @@ All wallet actions are tied to the user's Telegram ID.
 
 - The bot is designed to run as a long-lived process (e.g., on AWS Lambda, EC2, or any server).
 - All configuration (RPC URL, chain ID, fee wallet, encryption key, bot token) is loaded from environment variables.
-- **Do not** commit your `.env` file or any sensitive keys to version control.
+
 
 ---
 
