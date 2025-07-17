@@ -180,4 +180,4 @@ View on Explorer: https://explorer.inkonchain.com/tx/0x...
 
 ---
 
-For further questions, see the code comments or contact the project maintainer. 
+For further questions, please contact @DeployerOne on X. 
