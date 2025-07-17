@@ -1,17 +1,17 @@
 # Inky Buy Bot
 
-**Inky Buy Bot** is a Python-based Telegram bot that enables users to buy and sell tokens using ETH on the Ink Layer 2 blockchain. It provides a secure, custodial wallet experience, supports both Uniswap V2 and V3 router contracts for swaps, and is designed for robust, 24/7 operation (e.g., on AWS Lambda).
+**Inky Buy Bot** is a Python-based Telegram bot that enables users to buy and sell tokens using ETH on the Ink Layer 2 blockchain. It provides a secure, custodial wallet experience, supports only the InkyFactory (V3) router for swaps, and is designed for robust, 24/7 operation.
 
 ---
 
 ## 🚀 Features
 
 - **Custodial Wallets:** Each Telegram user gets a unique, securely stored wallet.
-- **Buy/Sell Tokens:** Swap ETH for tokens and vice versa using InkySwap (V2) and InkyFactory (V3) routers.
-- **Fee Routing:** 1% fee on swaps, routed to a designated fee wallet.
-- **Explorer Integration:** Token balances and transaction links use the InkOnChain explorer API.
+- **Buy/Sell Tokens:** Swap ETH for tokens and vice versa using the InkyFactory (V3) router. Only tokens with an Inky Factory V3 pool can be traded.
+- **Fee Routing:** 1% fee on swaps, routed to a designated fee wallet. Fee is deducted from the user's input for buys, and from the output for sells.
+- **Explorer Integration:** Transaction confirmations include a link to the InkOnChain explorer (always 0x-prefixed).
 - **Secure Key Management:** Private keys are encrypted at rest and never exposed except to the authenticated user.
-- **User-Friendly Telegram UX:** Intuitive command and menu-driven interface.
+- **User-Friendly Telegram UX:** Intuitive command and menu-driven interface, with clear error messages for unsupported tokens and pending transactions.
 
 ---
 
@@ -21,7 +21,6 @@
 - `wallet_utils.py` — Wallet creation, encryption, storage, and retrieval.
 - `swap_handler.py` — Swap routing, fee management, and contract interaction.
 - `config.py` — Network, router, and global constants.
-- `UniswapV2Router_ABI.json` — ABI for Uniswap V2 router.
 - `SwapRouter02_ABI.json` — ABI for Uniswap V3 router.
 - `wallets.db` — SQLite database for wallet storage (auto-created).
 
@@ -59,13 +58,7 @@ All wallet actions are tied to the user's Telegram ID.
 
 ### 3. Swap Routing & Execution
 
-#### Supported Routers
-
-- **UniswapV2Router (InkySwap):**
-  - Used for V2 liquidity pairs on InkySwap.com.
-  - Contract call: `swapExactETHForTokens` (buy), `swapExactTokensForETH` (sell).
-  - Path: `[WETH, token]` for buys, `[token, WETH]` for sells.
-  - Requires token approval for sells.
+#### Supported Router
 
 - **SwapRouter02 (InkyFactory):**
   - Used for V3 liquidity pairs deployed via InkyFactory.com.
@@ -73,19 +66,19 @@ All wallet actions are tied to the user's Telegram ID.
   - For buys: ETH is wrapped to WETH automatically.
   - For sells: WETH is unwrapped to ETH after the swap using the `withdraw` function.
 
-#### Router Selection Logic
+#### Pool Selection Logic
 
-- The bot checks for available pools/pairs:
-  - For V3: Calls `getPool(tokenIn, tokenOut, fee)` on the factory.
-  - For V2: Calls `getPair(tokenA, tokenB)` on the factory.
-- The first router with a valid pool/pair is used for the swap.
+- The bot only allows trades for tokens with a V3 pool on Inky Factory.
+- If no V3 pool exists for the token, the trade is rejected with a clear error message.
 
 #### Fee Handling
 
 - **1% Fee:** On every swap, 1% of the ETH value is sent to a designated fee wallet.
   - For buys: Fee is deducted from the ETH sent, and the remainder is swapped.
-  - For sells: After the swap, 1% of the received ETH is sent to the fee wallet, and the remainder is returned to the user.
+  - For sells: After the swap and unwrap, 1% of the received ETH is sent to the fee wallet, and the remainder is returned to the user.
 - **Fee Transactions:** All fee transfers are signed and sent from the user's wallet.
+- **Sequential Handling:** Each transaction (fee, swap, unwrap, return) is sent one at a time, waiting for each to be mined before proceeding. All transactions use 2x the current gas price for speed and reliability.
+- **Only the swap transaction hash is shown to the user in confirmations.**
 
 ### 4. Explorer API Usage
 
@@ -97,13 +90,14 @@ All wallet actions are tied to the user's Telegram ID.
   ```
   https://explorer.inkonchain.com/tx/{tx_hash}
   ```
+  (Always 0x-prefixed)
 
 ### 5. Security Practices
 
 - **Private Key Encryption:** All private keys are encrypted at rest using Fernet (AES-256).
 - **Access Control:** Only the Telegram user who owns a wallet can access its private key.
 - **No Sensitive Data in Code:** No private keys, sensitive API keys, or .env secrets are included in the codebase or documentation.
-- **Error Handling:** The bot gracefully handles errors such as unsupported tokens, failed swaps, and RPC timeouts.
+- **Error Handling:** The bot gracefully handles errors such as unsupported tokens, failed swaps, and RPC timeouts. If a previous transaction is pending, the user is told to wait before making another trade.
 
 ---
 
@@ -115,17 +109,17 @@ All wallet actions are tied to the user's Telegram ID.
 
 ---
 
-## 📝 Router Contract Differences
+## 📝 Router Contract Details
 
-| Feature         | UniswapV2Router (InkySwap)         | SwapRouter02 (InkyFactory)         |
-|-----------------|------------------------------------|------------------------------------|
-| Type            | V2                                 | V3                                 |
-| Buy Call        | `swapExactETHForTokens`            | `exactInputSingle`                 |
-| Sell Call       | `swapExactTokensForETH`            | `exactInputSingle` + `withdraw`    |
-| Path            | `[WETH, token]`                    | params object (tokenIn, tokenOut)  |
-| Pool Discovery  | `getPair(tokenA, tokenB)`          | `getPool(tokenIn, tokenOut, fee)`  |
-| Approval Needed | Yes (for sells)                    | Yes (for sells)                    |
-| WETH Handling   | Manual for V2, auto for V3         | Auto-wrap/unwrap in logic          |
+| Feature         | SwapRouter02 (InkyFactory)         |
+|-----------------|------------------------------------|
+| Type            | V3                                 |
+| Buy Call        | `exactInputSingle`                 |
+| Sell Call       | `exactInputSingle` + `withdraw`    |
+| Path            | params object (tokenIn, tokenOut)  |
+| Pool Discovery  | `getPool(tokenIn, tokenOut, fee)`  |
+| Approval Needed | Yes (for sells)                    |
+| WETH Handling   | Auto-wrap/unwrap in logic          |
 
 ---
 
@@ -147,6 +141,7 @@ All wallet actions are tied to the user's Telegram ID.
 
 /buy
 🛒 Buy Tokens
+⚠️ Only tokens with an Inky Factory V3 pool can be traded.
 🔗 Enter the token address you want to buy:
 User: 0xToken...
 
@@ -193,12 +188,10 @@ View on Explorer: https://explorer.inkonchain.com/tx/0x...
 
 ## ❗️ Notes
 
-- **Never share your `.env` file, private keys, or sensitive configuration.**
 - **This bot is for educational and operational use on Ink Layer 2.**
-- **All swaps are routed to the best available pool (V2 or V3) automatically.**
+- **Only tokens with an Inky Factory V3 pool can be traded.**
+- **All transactions use 2x the current gas price for speed and reliability.**
 
 ---
 
-For further questions, see the code comments or contact the project maintainer.
-
---- 
+For further questions, see the code comments or contact the project maintainer. 
