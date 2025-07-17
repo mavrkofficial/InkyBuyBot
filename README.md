@@ -172,20 +172,6 @@ View on Explorer: https://explorer.inkonchain.com/tx/0x...
 
 ---
 
-## 🏁 Running the Bot
-
-1. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-2. Set up your environment variables (see `.env.template` for required keys).
-3. Run the bot:
-   ```
-   python bot.py
-   ```
-
----
-
 ## ❗️ Notes
 
 - **This bot is for educational and operational use on Ink Layer 2.**
